@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.19.2",
+    "cors": "^2.8.5",
     "@adiwajshing/keyed-db": "^0.2.4",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@hapi/boom": "^10.0.1",
