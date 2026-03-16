@@ -673,4 +673,70 @@ async function startBot() {
         
         // Setup auth
         const { state, saveCreds } = await useMultiFileAuthState('./session')
-        const m
+        const msgRetryCounterCache = new NodeCache()
+        
+        // Create socket connection
+        sock = makeWASocket({
+            version,
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: false,
+            browser: ["SHADOW Bot", "Safari", "3.0"],
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })),
+            },
+            markOnlineOnConnect: true,
+            syncFullHistory: false,
+            msgRetryCounterCache,
+            generateHighQualityLinkPreview: true
+        })
+        
+        // Handle connection updates
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect } = update
+            
+            if (connection === 'open') {
+                botReady = true
+                console.log(chalk.green(`
+╔════════════════════════════════════╗
+║   ✅ BOT CONNECTED SUCCESSFULLY    ║
+╠════════════════════════════════════╣
+║  User: ${sock.user?.name || 'Unknown'}          ║
+║  Number: ${sock.user?.id?.split(':')[0] || 'N/A'}   ║
+╚════════════════════════════════════╝
+                `))
+            }
+            
+            if (connection === 'close') {
+                botReady = false
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== 401
+                console.log(chalk.red('❌ Connection closed'), lastDisconnect?.error)
+                
+                if (shouldReconnect) {
+                    console.log(chalk.yellow('🔄 Reconnecting in 5 seconds...'))
+                    setTimeout(startBot, 5000)
+                }
+            }
+        })
+        
+        // Save credentials
+        sock.ev.on('creds.update', saveCreds)
+        
+    } catch (error) {
+        console.error(chalk.red('❌ Bot initialization error:'), error)
+        console.log(chalk.yellow('🔄 Retrying in 10 seconds...'))
+        setTimeout(startBot, 10000)
+    }
+}
+
+// Start bot
+startBot()
+
+// Error handlers
+process.on('uncaughtException', (err) => {
+    console.error(chalk.red('Uncaught Exception:'), err)
+})
+
+process.on('unhandledRejection', (err) => {
+    console.error(chalk.red('Unhandled Rejection:'), err)
+})
